@@ -248,13 +248,13 @@ void decodeImage(const std::string& modelDir, const cgltf_image* image, int& w,
 
     if (!surface || surface->status() != CAIRO_STATUS_SUCCESS) {
         // hyprgraphics decodes only PNG, AVIF and SVG from memory, and a .glb
-        // embeds JPEGs as often (all five images of Khronos' DamagedHelmet.glb
-        // are image/jpeg). A failed embedded image that carries the JPEG magic
-        // falls back to the vendored stb_image -- the same decoder
-        // PlayerModel.cpp implements. stb's rows are top-first RGBA with
-        // straight alpha, exactly what the cairo conversion below produces.
-        if (embedded && embeddedSize > 3 && embedded[0] == 0xFF &&
-            embedded[1] == 0xD8 && embedded[2] == 0xFF) {
+        // embeds other formats as often (all five images of Khronos'
+        // DamagedHelmet.glb are image/jpeg). A failed embedded image falls
+        // back to the vendored stb_image -- the same decoder PlayerModel.cpp
+        // implements -- which auto-detects JPEG, PNG, BMP, TGA, GIF, PSD, HDR,
+        // PIC and PNM from bytes. stb's rows are top-first RGBA with straight
+        // alpha, exactly what the cairo conversion below produces.
+        if (embedded) {
             int W = 0, H = 0, COMP = 0;
             if (auto* PX = stbi_load_from_memory(
                     embedded, static_cast<int>(embeddedSize), &W, &H, &COMP, 4)) {
