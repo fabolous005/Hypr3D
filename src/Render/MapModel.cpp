@@ -8,6 +8,8 @@
 #include "World/MapCollision.hpp"
 
 #include <hyprgraphics/image/Image.hpp>
+
+#include "../../third_party/stb_image.h"
 #include <hyprutils/memory/SharedPtr.hpp>
 
 #include <algorithm>
@@ -224,11 +226,16 @@ void decodeImage(const std::string& modelDir, const cgltf_image* image, int& w,
                  int& h, std::vector<unsigned char>& rgba) {
     std::unique_ptr<Hyprgraphics::CImage> img;
 
+    const uint8_t* embedded = nullptr;
+    size_t         embeddedSize = 0;
+
     if (image->buffer_view) {
         const auto* BV   = image->buffer_view;
         const auto* BASE = static_cast<const uint8_t*>(cgltf_buffer_view_data(BV));
         if (!BASE)
             return;
+        embedded     = BASE;
+        embeddedSize = BV->size;
         img = std::make_unique<Hyprgraphics::CImage>(
             std::span<const uint8_t>{BASE, BV->size}, Hyprgraphics::IMAGE_FORMAT_AUTO);
     } else if (image->uri && !std::string_view{image->uri}.starts_with("data:")) {
@@ -239,8 +246,26 @@ void decodeImage(const std::string& modelDir, const cgltf_image* image, int& w,
 
     auto surface = (img && img->success()) ? img->cairoSurface() : nullptr;
 
-    if (!surface || surface->status() != CAIRO_STATUS_SUCCESS)
+    if (!surface || surface->status() != CAIRO_STATUS_SUCCESS) {
+        // hyprgraphics decodes only PNG, AVIF and SVG from memory, and a .glb
+        // embeds JPEGs as often (all five images of Khronos' DamagedHelmet.glb
+        // are image/jpeg). A failed embedded image that carries the JPEG magic
+        // falls back to the vendored stb_image -- the same decoder
+        // PlayerModel.cpp implements. stb's rows are top-first RGBA with
+        // straight alpha, exactly what the cairo conversion below produces.
+        if (embedded && embeddedSize > 3 && embedded[0] == 0xFF &&
+            embedded[1] == 0xD8 && embedded[2] == 0xFF) {
+            int W = 0, H = 0, COMP = 0;
+            if (auto* PX = stbi_load_from_memory(
+                    embedded, static_cast<int>(embeddedSize), &W, &H, &COMP, 4)) {
+                rgba.assign(PX, PX + static_cast<size_t>(W) * H * 4);
+                stbi_image_free(PX);
+                w = W;
+                h = H;
+            }
+        }
         return;
+    }
 
     const int W      = static_cast<int>(surface->size().x);
     const int H      = static_cast<int>(surface->size().y);
