@@ -21,7 +21,7 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 # down state -- turning the view on then crashed Hyprland (SIGSEGV, measured
 # on Hyprland 0.56.2; 162 such symbols came from Hyprland's headers). For
 # every target, Jolt included.
-add_compile_options(-fno-gnu-unique)
+# add_compile_options(-fno-gnu-unique)
 
 set(HYPRLAND_HEADERS "" CACHE PATH
     "Hyprland headers root containing include/hyprland"
